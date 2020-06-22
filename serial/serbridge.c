@@ -256,8 +256,8 @@ serbridgeRecvCb(void *arg, char *data, unsigned short len)
     if ((len == 2 && strncmp(data, "0 ", 2) == 0) ||
         (len == 2 && strncmp(data, "?\n", 2) == 0) ||
         (len == 3 && strncmp(data, "?\r\n", 3) == 0)) {
-      startPGM = true;
-      conn->conn_mode = cmPGM;
+      //startPGM = true;
+      //conn->conn_mode = cmPGM;
 
     // If the connection starts with a telnet negotiation we will do telnet
     } else if (len >= 2 && data[0] == IAC && (data[1]==WILL||data[1]==DO)) {
@@ -458,6 +458,8 @@ serbridgeDisconCb(void *arg)
     GPIO_OUTPUT_SET(mcu_reset_pin, 0);
     os_delay_us(100L);
     GPIO_OUTPUT_SET(mcu_reset_pin, 1);
+    if(in_mcu_flashing > 0)
+        in_mcu_flashing--;
   }
   conn->conn = NULL;
 }

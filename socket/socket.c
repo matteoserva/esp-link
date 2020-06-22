@@ -40,12 +40,19 @@ typedef struct {
 static SocketClient socketClient[MAX_SOCKET];
 static uint8_t socketNum = 0xff; // index into socketClient for next slot to allocate
 
+int  ICACHE_FLASH_ATTR serbridgeInMCUFlashing();
+
 // Any incoming data?
 static void ICACHE_FLASH_ATTR
 socketclient_recv_cb(void *arg, char *pusrdata, unsigned short length) {
 	struct espconn *pCon = (struct espconn *)arg;
 	SocketClient* client = (SocketClient *)pCon->reverse;
-
+    
+    DBG_SOCK("inflashing: %u\n",serbridgeInMCUFlashing());
+    if(serbridgeInMCUFlashing())
+        return;
+    
+    
 	uint8_t clientNum = client->conn_num;
 	uint8_t cb_type = USERCB_RECV;
 	DBG_SOCK("SOCKET #%d: Received %d bytes: %s\n", client-socketClient, length, pusrdata);
@@ -266,6 +273,7 @@ SOCKET_Setup(CmdPacket *cmd) {
 	// free any data structure that may be left from a previous connection
 	if (client->data) os_free(client->data);
 	if (client->pCon) {
+        espconn_delete(client->pCon);
 		if (sock_mode != SOCKET_UDP) {
 			if (client->pCon->proto.tcp) os_free(client->pCon->proto.tcp);
 		} else {
@@ -276,6 +284,14 @@ SOCKET_Setup(CmdPacket *cmd) {
 	os_memset(client, 0, sizeof(SocketClient));
 	DBG_SOCK("SOCKET #%d: Setup host=%s port=%d \n", clientNum, socket_host, port);
 
+    if(port == 0)
+    {
+       	cmdResponseStart(CMD_RESP_V, clientNum, 0);
+        cmdResponseEnd();
+        DBG_SOCK("SOCKET #%d: setup finished\n", clientNum);
+        return;   
+    }
+    
 	client->sock_mode = sock_mode;
 	client->resp_cb = cmd->value;
 	client->conn_num = clientNum;
@@ -327,7 +343,11 @@ SOCKET_Setup(CmdPacket *cmd) {
 		DBG_SOCK("SOCKET #%d: Create connection to ip %s:%d\n", clientNum, client->host, client->port);
 		
 		if(UTILS_StrToIP((char *)client->host, &client->pCon->proto.udp->remote_ip)) {
-			espconn_create(client->pCon);
+			sint8 createResult = espconn_create(client->pCon);
+            if(createResult != 0)
+            {
+                DBG_SOCK("createResult = #%d\n",createResult);
+            }
 		} else {
 			DBG_SOCK("SOCKET #%d: failed to copy remote_ip to &client->pCon->proto.udp->remote_ip\n", clientNum);
 			goto fail;
